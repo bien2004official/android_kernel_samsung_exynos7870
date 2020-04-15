@@ -125,6 +125,7 @@ enum usb_interface_condition {
  * @dev: driver model's view of this device
  * @usb_dev: if an interface is bound to the USB major, this will point
  *	to the sysfs representation for that device.
+ * @pm_usage_cnt: PM usage counter for this interface
  * @reset_ws: Used for scheduling resets from atomic context.
  * @resetting_device: USB core reset the device, so use alt setting 0 as
  *	current; needs bandwidth alloc after reset.
@@ -180,6 +181,7 @@ struct usb_interface {
 
 	struct device dev;		/* interface specific device info */
 	struct device *usb_dev;
+	atomic_t pm_usage_cnt;		/* usage counter for autosuspend */
 	struct work_struct reset_ws;	/* for resets in atomic context */
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
@@ -1218,6 +1220,9 @@ extern int usb_disabled(void);
 
 /* The following flags are used internally by usbcore and HCDs */
 #define URB_DIR_IN		0x0200	/* Transfer from device to host */
+#ifdef CONFIG_HOST_COMPLIANT_TEST
+#define URB_HCD_DRIVER_TEST	0x0400  /* Do NOT hand back or free this URB. */
+#endif
 #define URB_DIR_OUT		0
 #define URB_DIR_MASK		URB_DIR_IN
 

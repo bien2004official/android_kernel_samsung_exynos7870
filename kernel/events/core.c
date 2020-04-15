@@ -170,8 +170,13 @@ static struct srcu_struct pmus_srcu;
  *   0 - disallow raw tracepoint access for unpriv
  *   1 - disallow cpu events for unpriv
  *   2 - disallow kernel profiling for unpriv
+ *   3 - disallow all unpriv perf event use
  */
+#ifdef CONFIG_SECURITY_PERF_EVENTS_RESTRICT
+int sysctl_perf_event_paranoid __read_mostly = 3;
+#else
 int sysctl_perf_event_paranoid __read_mostly = 1;
+#endif
 
 /* Minimum for 512 kiB + 1 user control page */
 int sysctl_perf_event_mlock __read_mostly = 512 + (PAGE_SIZE / 1024); /* 'free' kiB per user */
@@ -1443,10 +1448,17 @@ static void perf_group_detach(struct perf_event *event)
 	 * If this was a group event with sibling events then
 	 * upgrade the siblings to singleton events by adding them
 	 * to whatever list we are on.
+	 * If this isn't on a list, make sure we still remove the sibling's
+	 * group_entry from this sibling_list; otherwise, when that sibling
+	 * is later deallocated, it will try to remove itself from this
+	 * sibling_list, which may well have been deallocated already,
+	 * resulting in a use-after-free.
 	 */
 	list_for_each_entry_safe(sibling, tmp, &event->sibling_list, group_entry) {
 		if (list)
 			list_move_tail(&sibling->group_entry, list);
+		else
+			list_del_init(&sibling->group_entry);
 		sibling->group_leader = sibling;
 
 		/* Inherit group flags from the previous leader */
@@ -3299,7 +3311,7 @@ find_lively_task_by_vpid(pid_t vpid)
 
 	/* Reuse ptrace permission checks for now. */
 	err = -EACCES;
-	if (!ptrace_may_access(task, PTRACE_MODE_READ_REALCREDS))
+	if (!ptrace_may_access(task, PTRACE_MODE_READ))
 		goto errout;
 
 	return task;
@@ -7491,6 +7503,9 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (flags & ~PERF_FLAG_ALL)
 		return -EINVAL;
 
+	if (perf_paranoid_any() && !capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
 	err = perf_copy_attr(attr_uptr, &attr);
 	if (err)
 		return err;
@@ -7696,6 +7711,29 @@ SYSCALL_DEFINE5(perf_event_open,
 		}
 
 		/*
+		 * Check if we raced against another sys_perf_event_open() call
+		 * moving the software group underneath us.
+		 */
+		if (!(group_leader->group_flags & PERF_GROUP_SOFTWARE)) {
+			/*
+			 * If someone moved the group out from under us, check
+			 * if this new event wound up on the same ctx, if so
+			 * its the regular !move_group case, otherwise fail.
+			 */
+			if (gctx != ctx) {
+				err = -EINVAL;
+				goto err_locked;
+			} else {
+				perf_event_ctx_unlock(group_leader, gctx);
+				move_group = 0;
+			}
+		}
+		/* 
+		 * See perf_event_ctx_lock() for comments on the details
+		 * of swizzling perf_event::ctx.
+		 */
+
+		/*
 		 * See perf_event_ctx_lock() for comments on the details
 		 * of swizzling perf_event::ctx.
 		 */
@@ -7725,7 +7763,6 @@ SYSCALL_DEFINE5(perf_event_open,
 		 * the old lists, before installing it on new lists.
 		 */
 		synchronize_rcu();
-
 		perf_install_in_context(ctx, group_leader, group_leader->cpu);
 		get_ctx(ctx);
 		list_for_each_entry(sibling, &group_leader->sibling_list,
