@@ -221,7 +221,6 @@ uart_dbg_store(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR(uart_dbg, 0640, uart_dbg_show, uart_dbg_store);
 
-
 struct proc_dir_entry *serial_dir, *serial_log_dir;
 
 static void uart_copy_to_local_buf(int dir, struct uart_local_buf* local_buf,
@@ -275,21 +274,21 @@ uart_error_cnt_show(struct device *dev, struct device_attribute *attr, char *buf
 {
 	int ret=0;
 	struct s3c24xx_uart_port *ourport;
-	sprintf(buf, "000 000 000 000\n");//init buf : overrun parity frame break count
+	sprintf(buf, "000 000 000 000\n"); //init buf : overrun parity frame break count
 
-	list_for_each_entry(ourport, &drvdata_list, node){ 
-	struct uart_port *port = &ourport->port;
-	
-	if (&ourport->pdev->dev != dev)
-		continue;
+	list_for_each_entry(ourport, &drvdata_list, node) {
+		struct uart_port *port = &ourport->port;
 
-	ret = sprintf(buf, "%03x %03x %03x %03x\n", port->icount.overrun, 0, port->icount.frame, port->icount.brk);
+		if (&ourport->pdev->dev != dev)
+			continue;
 
+		ret = sprintf(buf, "%03x %03x %03x %03x\n", port->icount.overrun, 0, port->icount.frame, port->icount.brk);
 	}
+
 	return ret;
 }
 
-static DEVICE_ATTR(error_cnt, 0664, uart_error_cnt_show, NULL);
+static DEVICE_ATTR(error_cnt, 0220, uart_error_cnt_show, NULL);
 
 static void s3c24xx_serial_resetport(struct uart_port *port,
 				   struct s3c2410_uartcfg *cfg);
@@ -1929,28 +1928,28 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
         if (ourport->uart_logging == 1) {
             /* Allocate memory for UART logging */
             ourport->uart_local_buf.buffer = kzalloc(LOG_BUFFER_SIZE, GFP_KERNEL);
-    
+
             if (!ourport->uart_local_buf.buffer)
                 dev_err(&pdev->dev, "could not allocate buffer for UART logging\n");
-    
+
             ourport->uart_local_buf.size = LOG_BUFFER_SIZE;
             ourport->uart_local_buf.index = 0;
 #ifdef SERIAL_UART_TRACE
                     if (port_index == SERIAL_UART_PORT_LINE) {
                         struct proc_dir_entry *ent;
-            
+
                         serial_dir = proc_mkdir("serial", NULL);
                         if (serial_dir == NULL) {
                             pr_err("Unable to create /proc/serial directory\n");
                             return -ENOMEM;
                         }
-            
+
                         serial_log_dir = proc_mkdir("uart", serial_dir);
                         if (serial_log_dir == NULL) {
                             pr_err("Unable to create /proc/serial/uart directory\n");
                             return -ENOMEM;
                         }
-                    
+
                         ent = proc_create("log", 0444, serial_log_dir, &proc_fops_serial_log);
                         if (ent == NULL) {
                             pr_err("Unable to create /proc/%s/log entry\n", PROC_SERIAL_DIR);
