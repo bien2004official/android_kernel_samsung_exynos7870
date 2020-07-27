@@ -49,7 +49,9 @@
 #include <linux/sched/deadline.h>
 #include <linux/timer.h>
 #include <linux/freezer.h>
+#ifdef CONFIG_EXYNOS_SNAPSHOT_HRTIMER
 #include <linux/exynos-ss.h>
+#endif
 
 #include <asm/uaccess.h>
 
@@ -99,6 +101,9 @@ DEFINE_PER_CPU(struct hrtimer_cpu_base, hrtimer_bases) =
 };
 
 static const int hrtimer_clock_to_base_table[MAX_CLOCKS] = {
+	/* Make sure we catch unsupported clockids */
+	[0 ... MAX_CLOCKS - 1]	= HRTIMER_MAX_CLOCK_BASES,
+
 	[CLOCK_REALTIME]	= HRTIMER_BASE_REALTIME,
 	[CLOCK_MONOTONIC]	= HRTIMER_BASE_MONOTONIC,
 	[CLOCK_BOOTTIME]	= HRTIMER_BASE_BOOTTIME,
@@ -107,7 +112,9 @@ static const int hrtimer_clock_to_base_table[MAX_CLOCKS] = {
 
 static inline int hrtimer_clockid_to_base(clockid_t clock_id)
 {
-	return hrtimer_clock_to_base_table[clock_id];
+	int base = hrtimer_clock_to_base_table[clock_id];
+	BUG_ON(base == HRTIMER_MAX_CLOCK_BASES);
+	return base;
 }
 
 
@@ -1224,9 +1231,13 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 */
 	raw_spin_unlock(&cpu_base->lock);
 	trace_hrtimer_expire_entry(timer, now);
+#ifdef CONFIG_EXYNOS_SNAPSHOT_HRTIMER
 	exynos_ss_hrtimer(timer, &now->tv64, fn, ESS_FLAG_IN);
+#endif
 	restart = fn(timer);
+#ifdef CONFIG_EXYNOS_SNAPSHOT_HRTIMER
 	exynos_ss_hrtimer(timer, &now->tv64, fn, ESS_FLAG_OUT);
+#endif
 	trace_hrtimer_expire_exit(timer);
 	raw_spin_lock(&cpu_base->lock);
 

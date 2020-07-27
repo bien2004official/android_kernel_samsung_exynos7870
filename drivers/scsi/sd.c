@@ -1927,8 +1927,10 @@ static int sd_read_protection_type(struct scsi_disk *sdkp, unsigned char *buffer
 	u8 type;
 	int ret = 0;
 
-	if (scsi_device_protection(sdp) == 0 || (buffer[12] & 1) == 0)
+	if (scsi_device_protection(sdp) == 0 || (buffer[12] & 1) == 0) {
+		sdkp->protection_type = 0;
 		return ret;
+	}
 
 	type = ((buffer[12] >> 1) & 7) + 1; /* P_TYPE 0 = Type 1 */
 
@@ -2329,7 +2331,6 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 	int res;
 	struct scsi_device *sdp = sdkp->device;
 	struct scsi_mode_data data;
-	int disk_ro = get_disk_ro(sdkp->disk);
 	int old_wp = sdkp->write_prot;
 
 	set_disk_ro(sdkp->disk, 0);
@@ -2370,7 +2371,7 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 			  "Test WP failed, assume Write Enabled\n");
 	} else {
 		sdkp->write_prot = ((data.device_specific & 0x80) != 0);
-		set_disk_ro(sdkp->disk, sdkp->write_prot || disk_ro);
+		set_disk_ro(sdkp->disk, sdkp->write_prot);
 		if (sdkp->first_scan || old_wp != sdkp->write_prot) {
 			sd_printk(KERN_NOTICE, sdkp, "Write Protect is %s\n",
 				  sdkp->write_prot ? "on" : "off");
@@ -3179,12 +3180,6 @@ static int sd_probe(struct device *dev)
 		 */
 		q->nr_requests = BLKDEV_MAX_RQ / 8;
 		if (q->nr_requests < 32) q->nr_requests = 32;
-#ifdef CONFIG_LARGE_DIRTY_BUFFER
-		/* apply more throttle on non-ufs scsi device */
-		q->backing_dev_info.capabilities |= BDI_CAP_STRICTLIMIT;
-		bdi_set_min_ratio(&q->backing_dev_info, 30);
-		bdi_set_max_ratio(&q->backing_dev_info, 60);
-#endif
 		pr_info("Parameters for SCSI-dev(%s): min/max_ratio: %u/%u "
 			"strictlimit: on nr_requests: %lu read_ahead_kb: %lu\n",
 			gd->disk_name,
@@ -3251,17 +3246,6 @@ static int sd_remove(struct device *dev)
 {
 	struct scsi_disk *sdkp;
 	dev_t devt;
-
-#ifdef CONFIG_LARGE_DIRTY_BUFFER
-	struct scsi_device *sdp;
-
-	/* restore bdi min/max ratio before device removal */
-	sdp = to_scsi_device(dev);
-	if (sdp && sdp->request_queue) {
-		bdi_set_min_ratio(&sdp->request_queue->backing_dev_info, 0);
-		bdi_set_max_ratio(&sdp->request_queue->backing_dev_info, 100);
-	}
-#endif
 
 	sdkp = dev_get_drvdata(dev);
 	devt = disk_devt(sdkp->disk);

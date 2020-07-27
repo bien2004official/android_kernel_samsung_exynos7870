@@ -176,11 +176,3 @@ obj-$(CONFIG_IP_SET) += ipset/
 
 # IPVS
 obj-$(CONFIG_IP_VS) += ipvs/
-
-# Inside Secure VPN
-obj-$(CONFIG_VPNCLIENT_SECURITY) += interceptor/
-
-# netfilter prio
-obj-y += xt_PRIO.o
-
-obj-$(CONFIG_NF_HISTORY) += nf_history.o

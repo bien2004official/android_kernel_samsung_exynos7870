@@ -90,7 +90,7 @@ static void dm_unhook_bio(struct dm_hook_info *h, struct bio *bio)
 	 * Must bump bi_remaining to allow bio to complete with
 	 * restored bi_end_io.
 	 */
-	atomic_inc(&bio->bi_remaining);
+	bio_inc_remaining(bio);
 }
 
 /*----------------------------------------------------------------*/
@@ -1690,8 +1690,8 @@ static void wait_for_migrations(struct cache *cache)
 
 static void stop_worker(struct cache *cache)
 {
-	cancel_delayed_work(&cache->waker);
-	flush_workqueue(cache->wq);
+	cancel_delayed_work_sync(&cache->waker);
+	drain_workqueue(cache->wq);
 }
 
 static void requeue_deferred_io(struct cache *cache)

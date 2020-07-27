@@ -6,7 +6,7 @@
 #include "queueing.h"
 
 struct multicore_worker __percpu *
-wg_packet_alloc_percpu_multicore_worker(work_func_t function, void *ptr)
+wg_packet_percpu_multicore_worker_alloc(work_func_t function, void *ptr)
 {
 	int cpu;
 	struct multicore_worker __percpu *worker =
@@ -33,10 +33,12 @@ int wg_packet_queue_init(struct crypt_queue *queue, work_func_t function,
 		return ret;
 	if (function) {
 		if (multicore) {
-			queue->worker = wg_packet_alloc_percpu_multicore_worker(
+			queue->worker = wg_packet_percpu_multicore_worker_alloc(
 				function, queue);
-			if (!queue->worker)
+			if (!queue->worker) {
+				ptr_ring_cleanup(&queue->ring, NULL);
 				return -ENOMEM;
+			}
 		} else {
 			INIT_WORK(&queue->work, function);
 		}

@@ -33,10 +33,6 @@
 #include "../../drivers/soc/samsung/pwrcal/S5E7870/S5E7870-vclk.h"
 #endif
 
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-#include <linux/sec_debug.h>
-#endif
-
 static struct exynos_dvfs_info *exynos_info[CL_END];
 
 static unsigned int exynos_mp_cpufreq_cl0_get_freq(void)
@@ -113,9 +109,6 @@ static int exynos_mp_cpufreq_check_smpl(void)
 		return ret;
 	} else if (ret > 0) {
 		pr_info("CL1 : SMPL_WARN HAPPENED!\n");
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO		
-		sec_debug_set_extra_info_smpl(1);
-#endif
 		return ret;
 	} else {
 		pr_err("CL1 : SMPL_WARN check failed.\n");
@@ -211,9 +204,6 @@ static int exynos_mp_cpufreq_init_cal_table(cluster_type cluster)
 			cluster ? "CL1" : "CL0",
 			ptr_temp_table[cal_max_support_idx].rate,
 			ptr_temp_table[ptr->max_support_idx].rate);
-
-	if (ptr->max_support_idx < cal_max_support_idx)
-		ptr->max_support_idx = cal_max_support_idx;
 
 	pr_info("CPUFREQ of %s Current max freq %lu KHz\n",
 				cluster ? "CL1" : "CL0",

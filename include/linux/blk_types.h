@@ -65,7 +65,7 @@ struct bio {
 	unsigned int		bi_seg_front_size;
 	unsigned int		bi_seg_back_size;
 
-	atomic_t		bi_remaining;
+	atomic_t		__bi_remaining;
 
 	bio_end_io_t		*bi_end_io;
 
@@ -97,7 +97,7 @@ struct bio {
 
 	unsigned short		bi_max_vecs;	/* max bvl_vecs we can hold */
 
-	atomic_t		bi_cnt;		/* pin count */
+	atomic_t		__bi_cnt;	/* pin count */
 
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
 
@@ -127,13 +127,8 @@ struct bio {
 #define BIO_NULL_MAPPED 8	/* contains invalid user pages */
 #define BIO_QUIET	9	/* Make BIO Quiet */
 #define BIO_SNAP_STABLE	10	/* bio data must be snapshotted during write */
-
-#ifdef CONFIG_JOURNAL_DATA_TAG
-/* XXX Be carefull not to touch BIO_RESET_BITS */
-#define BIO_JOURNAL    11      /* bio contains journal data */
-#define BIO_JMETA      12      /* bio contains metadata */
-#define BIO_JOURNAL_TAG_MASK   ((1UL << BIO_JOURNAL) | (1UL << BIO_JMETA))
-#endif
+#define BIO_CHAIN	11	/* chained bio, ->bi_remaining in effect */
+#define BIO_REFFED	12	/* bio has elevated ->bi_cnt */
 
 #define BIO_BYPASS	13
 
